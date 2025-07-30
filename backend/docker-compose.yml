@@ -1,0 +1,17 @@
+version: "3"
+services:
+  timescaledb:
+    image: timescale/timescaledb-ha:pg17
+    container_name: timescaledb
+    environment:
+      #   POSTGRES_USER: gaze
+      POSTGRES_PASSWORD: password
+    #   POSTGRES_DB: gaze_data
+    ports:
+      - "5434:5432" #5432 will be taken on your local machine by local installation of postgres so we map to 5434
+    volumes:
+      - timescale_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+
+volumes:
+  timescale_data:

@@ -3,6 +3,8 @@ import { FaceLandmarker, FilesetResolver } from "@mediapipe/tasks-vision";
 import { v4 as uuidv4 } from "uuid";
 import { ToastContainer, toast } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
+import { getAllMeasurements, deleteMeasurementsInRange, saveMeasurementLocally } from "./components/localdb";
+import { useDeviceLabel } from "./hooks/useDeviceLabel";
 
 // === Constants ===
 const SAMPLE_RATE = 30; // ~30 Hz
@@ -10,6 +12,7 @@ const CALIBRATION_STEPS = ["left", "center", "right"];
 // Path to WASM and model – adjust if your Vite public assets folder differs
 const WASM_PATH = "/wasm";
 const MODEL_PATH = "/models/face_landmarker.task";
+const BACKEND_URL = "http://localhost:8000";
 
 // Simple interval hook that runs while delay is not null
 function useInterval(callback, delay) {
@@ -42,6 +45,39 @@ export default function App() {
   const [recording, setRecording] = useState(false);
   const [sessionId] = useState(uuidv4());
   const recordingRef = useRef([]); // Holds {t, gazeX}
+  const currentFpsRef = useRef(SAMPLE_RATE); // Use useRef to store currentFps
+
+  const { label: devicePlatform} = useDeviceLabel();
+  console.log(devicePlatform, 'devicePlatform')
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (navigator.onLine) {
+        syncMeasurements();
+      }
+    }, 1000); // every 10 seconds
+  
+    return () => clearInterval(interval);
+  }, []);
+
+  const syncMeasurements = async () => {
+    const measurement_batch = await getAllMeasurements();
+    console.log(measurement_batch, 'measurement_batch')
+    try {
+      if (measurement_batch.length > 0) {
+        const response = await fetch(`${BACKEND_URL}/api/upload`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ measurement_batch }),
+        });
+      if (response.ok) {
+        await deleteMeasurementsInRange(measurement_batch[0].timestamp_ms, measurement_batch[measurement_batch.length - 1].timestamp_ms);
+      }
+    }
+    } catch (e) {
+      console.error('Upload failed', e);
+    }
+  }
 
   
   useEffect(() => {
@@ -61,8 +97,11 @@ export default function App() {
   }, []);
 
   // === Initialise user‑facing camera ===
+
   
   useEffect(() => {
+  
+
     const initCamera = async () => {
       const stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: "user" },
@@ -70,37 +109,39 @@ export default function App() {
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
   
-      let lastTime = performance.now();
-      let frameCount = 0;
-      const video = videoRef.current;
+      // let lastTime = performance.now();
+      // let frameCount = 0;
+      // const video = videoRef.current;
   
-      function measureFrameRate(now) {
-        frameCount++;
-        const elapsed = now - lastTime;
+      // function measureFrameRate(now) {
+      //   frameCount++;
+      //   const elapsed = now - lastTime;
 
-        if (elapsed >= 1000) {
-          const fps = frameCount;
-          console.log(`Effective camera frame rate: ${fps} fps`);
-          lastTime = now;
-          frameCount = 0;
+      //   if (elapsed >= 1000) {
+      //     const fps = frameCount;
+      //     console.log(`Effective camera frame rate: ${fps} fps`);
+      //     lastTime = now;
+      //     frameCount = 0;
 
-          // Update graph with current frame rate
-          const graphCanvas = document.getElementById('frameRateGraph');
-          const ctx = graphCanvas.getContext('2d');
-          ctx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
-          ctx.fillStyle = 'white';
-          ctx.fillRect(0, graphCanvas.height - (fps / 2), graphCanvas.width, fps / 2); // Scale the bar height
-          ctx.fillStyle = 'black';
-          ctx.fillText(`frame rate:${fps} Hz`, 5, 15);
-        }
+      //     currentFpsRef.current = fps;
 
-        video.requestVideoFrameCallback(measureFrameRate);
-      }
+      //     // Update graph with current frame rate
+      //     const graphCanvas = document.getElementById('frameRateGraph');
+      //     const ctx = graphCanvas.getContext('2d');
+      //     ctx.clearRect(0, 0, graphCanvas.width, graphCanvas.height);
+      //     ctx.fillStyle = 'white';
+      //     ctx.fillRect(0, graphCanvas.height - (fps / 2), graphCanvas.width, fps / 2); // Scale the bar height
+      //     ctx.fillStyle = 'black';
+      //     ctx.fillText(`frame rate:${fps} Hz`, 5, 15);
+      //   }
+
+      //   video.requestVideoFrameCallback(measureFrameRate);
+      // }
   
-      // Start measuring frame rate only if the video is ready
-      if (video.readyState >= 2) { // readyState 2 means "have enough data to play"
-        video.requestVideoFrameCallback(measureFrameRate);
-      }
+      // // Start measuring frame rate only if the video is ready
+      // if (video.readyState >= 2) { // readyState 2 means "have enough data to play"
+      //   video.requestVideoFrameCallback(measureFrameRate);
+      // }
     };
     initCamera();
   }, []);
@@ -128,6 +169,8 @@ export default function App() {
     }
   }, [calibrationIndex, calibrationData]);
   
+  const lastFrameTimeRef = useRef(performance.now());
+  const frameTimestampsRef = useRef([]); // To keep a short history
   // === Frame loop ===
   const processFrame = useCallback(async () => {
     if (!recording) {
@@ -138,6 +181,19 @@ export default function App() {
     if (!landmarker || !video || video.readyState !== 4) return;
 
     const results = await landmarker.detectForVideo(video, performance.now());
+
+    const now = performance.now();
+    const elapsed = now - lastFrameTimeRef.current;
+    lastFrameTimeRef.current = now;
+
+    frameTimestampsRef.current.push(elapsed);
+    if (frameTimestampsRef.current.length > 30) {
+      frameTimestampsRef.current.shift(); // Keep the last 30 frames
+    }
+
+    // Average FPS over last N frames
+    const avgFrameTime = frameTimestampsRef.current.reduce((a, b) => a + b, 0) / frameTimestampsRef.current.length;
+    const currentFps = 1000 / avgFrameTime;
 
     if (results.faceLandmarks.length) {
       // Iris landmark indices (468–473). We'll take 468 (left) & 473 (right)
@@ -160,6 +216,17 @@ export default function App() {
         calibratedX = Math.max(-1, Math.min(1, calibratedX));
         // console.log(calibratedX)
         setGazeX(calibratedX);
+        currentFpsRef.current = parseFloat(currentFps.toFixed(2));
+        saveMeasurementLocally({
+          user_id: sessionId,
+          session_id: sessionId,
+          timestamp_ms: Date.now(),
+          gaze_x: calibratedX,
+          sampling_rate: parseFloat(currentFps.toFixed(2)),  // Save FPS here
+          device: devicePlatform,
+          calibration_params: [left, center, right],
+          device_label: devicePlatform,
+        })
       }
 
       // === Overlay ===
@@ -227,7 +294,7 @@ export default function App() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-screen bg-white text-black px-6 py-4">
       <ToastContainer />
-      
+      <p>FPS: {currentFpsRef.current.toFixed(2)}</p>
       <div className="relative w-full sm:w-[640px] sm:h-[480px] rounded-xl overflow-hidden">
       <canvas id="frameRateGraph" width="90" height="20" style={{ position: 'absolute', top: 0, right: 0, zIndex: 100 }}></canvas>
         <div style={{ position: 'absolute', top: 0, left: 0, color: 'white', padding: '5px', zIndex: 100, backgroundColor: 'rgba(0, 0, 0, 0.5)' }}>

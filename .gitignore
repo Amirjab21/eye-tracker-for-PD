@@ -24,3 +24,6 @@ dist-ssr
 *.sw?
 
 *.env
+
+/backend/fastAPI/env/*
+__pycache__
