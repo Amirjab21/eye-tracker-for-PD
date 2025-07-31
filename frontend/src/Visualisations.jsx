@@ -141,14 +141,14 @@ export default function Visualisations() {
                 </div>
                 {loading ? <div>Loading session data...</div> : <>
                 <div className="w-full flex">
-                    <D3Chart data={dummydata} yLabel="X position normalised" /> 
+                    <D3Chart data={dummydata} yRange={[-1, 1]} yLabel="X position normalised" /> 
                 </div>
                 
                 {/* Display velocityData using a chart or table */}
                 <div className="w-full">
                     <D3Chart data={velocityData} yLabel="movement velocity" />
                 </div>
-                <h2>Movement Frequency Analysis</h2>
+                
                 <div>
                     <FrequencyAnalysis data={dummydata} />
                 </div>

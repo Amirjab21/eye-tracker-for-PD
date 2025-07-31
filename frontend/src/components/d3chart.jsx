@@ -2,7 +2,7 @@ import React, { useRef, useEffect } from 'react';
 import * as d3 from 'd3';
 // import { Card, CardContent } from '@/components/ui/card';
 
-export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel }) {
+export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel, yRange = null, xIsTime = true }) {
   const chartRef = useRef(null);
   const clipId = useRef(`clip-${Math.random().toString(36).substr(2, 9)}`);
   useEffect(() => {
@@ -27,28 +27,39 @@ export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel }) {
       .append('g')
       .attr('transform', `translate(${margin.left},${margin.top})`);
 
-          // Compute min timestamp
-    const minTimestamp = d3.min(data, d => d.timestamp);
-    const maxSeconds = d3.max(data, d => (d.timestamp - minTimestamp) / 1000);
+    // Compute x domain
+    let minTimestamp = 0;
+    let maxX = 0;
+    if (xIsTime) {
+      minTimestamp = d3.min(data, d => d.timestamp);
+      maxX = d3.max(data, d => (d.timestamp - minTimestamp) / 1000);
+    } else {
+      maxX = d3.max(data, d => d.timestamp);
+    }
 
     // Scales
     const x = d3
       .scaleLinear()
-      .domain([0, maxSeconds])
+      .domain([0, maxX])
       .range([0, width]);
 
+    const yDomain = yRange ? yRange : d3.extent(data, d => d.value);
     const y = d3
       .scaleLinear()
-      .domain(d3.extent(data, d => d.value))
+      .domain(yDomain)
       .range([height, 0])
       .nice();
 
     // Axes
     const xAxis = svg.append('g')
       .attr('transform', `translate(0, ${height})`)
-      .call(d3.axisBottom(x).tickFormat(d => d.toFixed(0) + 's'));
+      .call(
+        d3.axisBottom(x).tickFormat(d =>
+          xIsTime ? d.toFixed(0) + 's' : d.toFixed(2)
+        )
+      );
 
-    const yAxis = svg.append('g')
+    svg.append('g')
       .call(d3.axisLeft(y));
 
     // X axis label
@@ -57,7 +68,7 @@ export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel }) {
       .attr('text-anchor', 'middle')
       .attr('x', width / 2)
       .attr('y', height + margin.bottom - 5)
-      .text(xLabel || 'seconds since start');
+      .text(xLabel || (xIsTime ? 'seconds since start' : 'x'));
 
     // Y axis label
     svg.append('text')
@@ -79,6 +90,15 @@ export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel }) {
     const chart = svg.append('g')
       .attr('clip-path', `url(#${clipId.current})`);
 
+    // Add background rect (light gray)
+    svg.append('rect')
+      .attr('x', 0)
+      .attr('y', 0)
+      .attr('width', width)
+      .attr('height', height)
+      .attr("opacity", 0.3)
+      .attr('fill', '#f3f4f6'); // Tailwind gray-100
+
     // Add horizontal line at y = 0
     svg.append('line')
       .attr('x1', 0)
@@ -95,7 +115,7 @@ export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel }) {
       .attr('stroke', 'currentColor')
       .attr('stroke-width', 2)
       .attr('d', d3.line()
-        .x(d => x((d.timestamp - minTimestamp) / 1000))
+        .x(d => x(xIsTime ? (d.timestamp - minTimestamp) / 1000 : d.timestamp))
         .y(d => y(d.value)));
 
     // Zoom behavior
@@ -105,9 +125,13 @@ export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel }) {
       .extent([[0, 0], [width, height]])
       .on('zoom', event => {
         const zx = event.transform.rescaleX(x);
-        xAxis.call(d3.axisBottom(zx).tickFormat(d => d.toFixed(0)));
+        xAxis.call(
+          d3.axisBottom(zx).tickFormat(d =>
+            xIsTime ? d.toFixed(0) + 's' : d.toFixed(2)
+          )
+        );
         chart.selectAll('path').attr('d', d3.line()
-          .x(d => zx((d.timestamp - minTimestamp) / 1000))
+          .x(d => zx(xIsTime ? (d.timestamp - minTimestamp) / 1000 : d.timestamp))
           .y(d => y(d.value)));
       });
     // Append invisible rect for zoom on top
@@ -119,7 +143,7 @@ export default function TimeSeriesZoomPan({ data, yLabel = '', xLabel }) {
       .attr('cursor', 'move')
       .call(zoom);
 
-  }, [data, yLabel, xLabel]);
+  }, [data, yLabel, xLabel, yRange, xIsTime]);
 
   return (
     <div ref={chartRef} className="w-full h-96"></div>

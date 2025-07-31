@@ -8,6 +8,10 @@ from database import connect_to_db
 from io import StringIO
 import csv
 from fastapi.responses import StreamingResponse
+from aiokafka import AIOKafkaProducer
+import json
+
+KAFKA_URL = "kafka:9092"
 
 app = FastAPI()
 
@@ -44,6 +48,41 @@ class MeasurementBatch(BaseModel):
     measurements: List[Measurement]
 
 
+async def save_to_db(app, records):
+    try:
+        async with app.state.db.acquire() as conn:
+            await conn.copy_records_to_table(
+                "gaze_data",
+                records=records,
+                columns=[
+                    "user_id",
+                    "session_id",
+                    "timestamp_ms",
+                    "gaze_x",
+                    "sampling_rate",
+                    "calibration_params",
+                    "device",
+                ],
+            )
+        return True, None
+    except Exception as e:
+        print(f"Error: {e}")
+        return False, str(e)
+
+
+async def send_to_kafka(app, data):
+    if not hasattr(app.state, "kafka_producer"):
+        app.state.kafka_producer = AIOKafkaProducer(bootstrap_servers=KAFKA_URL)
+        await app.state.kafka_producer.start()
+    producer = app.state.kafka_producer
+    try:
+        await producer.send_and_wait("processing", json.dumps(data).encode())
+        return True, None
+    except Exception as e:
+        print(f"Kafka error: {e}")
+        return False, str(e)
+
+
 @app.post("/api/upload")
 async def upload(request: Request):
     data = await request.json()
@@ -60,25 +99,12 @@ async def upload(request: Request):
         )
         for row in data
     ]
-    try:
-        async with app.state.db.acquire() as conn:
-            await conn.copy_records_to_table(
-                "gaze_data",
-                records=records,
-                columns=[
-                    "user_id",
-                    "session_id",
-                    "timestamp_ms",
-                    "gaze_x",
-                    "sampling_rate",
-                    "calibration_params",
-                    "device",
-                ],
-            )
-    except Exception as e:
-        print(f"Error: {e}")
-        return {"status": "error", "message": str(e)}
-
+    ok, err = await save_to_db(app, records)
+    if not ok:
+        return {"status": "error", "message": err}
+    ok, err = await send_to_kafka(app, data)
+    if not ok:
+        return {"status": "error", "message": f"DB saved but Kafka error: {err}"}
     return {"status": "ok"}
 
 

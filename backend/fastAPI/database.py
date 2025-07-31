@@ -1,4 +1,8 @@
 import asyncpg
+import os
+
+PORT = os.getenv("PORT", 5434)
+HOST = os.getenv("HOST", "localhost")
 
 
 async def connect_to_db():
@@ -6,6 +10,6 @@ async def connect_to_db():
         user="gaze",
         password="password",
         database="gaze_data",
-        host="localhost",
-        port=5434,  # Use the port you mapped in docker-compose
+        host=HOST,
+        port=PORT,  # Use the port you mapped in docker-compose
     )

@@ -1,7 +1,6 @@
 import React, { useMemo } from "react";
-import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
 import FFT from "fft.js";
-// import { Card, CardContent } from "@/components/ui/card";
+import D3Chart from "./d3chart";
 
 /**
  * FrequencyAnalysis – visualises the dominant movement frequencies in a horizontal eye‑movement time‑series.
@@ -64,26 +63,19 @@ const FrequencyAnalysis = ({ data} ) => {
   // Generate a unique chartId for this chart instance
   const chartId = React.useRef(`freq-chart-${Math.random().toString(36).substr(2, 9)}`);
 
+  const spectrumForD3 = spectrum.map(d => ({
+    timestamp: d.freq, // use frequency as the x-axis
+    value: d.amp       // use amplitude as the y-axis
+  }));
+
+  console.log(spectrum, 'spectrumForD3')
+
   return (
         <div>
             <h2 className="text-xl font-bold mb-2">Horizontal‑Movement Frequency Spectrum</h2>
             {spectrum.length ? (
-            <>
-                <LineChart
-                  width={600}
-                  height={300}
-                  data={spectrum}
-                  margin={{ top: 10, right: 30, left: 20, bottom: 20 }}
-                  id={chartId.current}
-                >
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" dataKey="freq" label={{ value: "Frequency (Hz)", position: "insideBottom", offset: -10 }} tickFormatter={(v) => v.toFixed(2)} />
-                <YAxis dataKey="amp" label={{ value: "Amplitude", angle: -90, position: "insideLeft" }} />
-                {/* <Tooltip formatter={(v) => v.toFixed(2)} /> */}
-                <Line type="monotone" dataKey="amp" strokeWidth={2} dot={false} />
-                </LineChart>
-                <p className="mt-4 text-sm text-muted-foreground">Dominant frequency ≈ <strong>{dominantFreq}</strong> Hz</p>
-            </>
+            
+                <D3Chart xIsTime={false} data={spectrumForD3} xLabel="Frequency (Hz)" yLabel="Amplitude" />
             ) : (
             <p>Provide at least four data to compute a spectrum.</p>
             )}

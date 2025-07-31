@@ -13,5 +13,85 @@ services:
       - timescale_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
 
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka
+    environment:
+      - KAFKA_CFG_NODE_ID=1
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@kafka:9093
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9092
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      - KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE=true
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka_data:/bitnami/kafka
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "kafka-topics.sh",
+          "--bootstrap-server",
+          "localhost:9092",
+          "--list",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  processing-service:
+    build: ./processing-service
+    container_name: processing-service
+    environment:
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      - kafka
+    ports:
+      - "8001:8001"
+    command:
+      [
+        "/app/wait-for-kafka.sh",
+        "kafka:9092",
+        "uvicorn",
+        "main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8001",
+      ]
+    volumes:
+      - ./wait-for-kafka.sh:/app/wait-for-kafka.sh
+
+  fastapi:
+    build: ./fastAPI
+    container_name: fastapi
+    environment:
+      - PORT=5432
+      - HOST=timescaledb
+    ports:
+      - "8000:8000"
+    depends_on:
+      - timescaledb
+      - kafka
+    command:
+      [
+        "/app/wait-for-kafka.sh",
+        "kafka:9092",
+        "uvicorn",
+        "main:app",
+        "--host",
+        "0.0.0.0",
+        "--port",
+        "8000",
+      ]
+    volumes:
+      - ./wait-for-kafka.sh:/app/wait-for-kafka.sh
+
 volumes:
   timescale_data:
+  kafka_data:
