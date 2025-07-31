@@ -52,7 +52,7 @@ export default function Home() {
   const handleNewGaze = (gaze_x, timestamp_ms) => {
     setGazeData(prev => [
       ...prev.slice(-299), // keep only the last 300 points for performance
-      { date: new Date(timestamp_ms), value: gaze_x }
+      { timestamp: timestamp_ms, value: gaze_x }
     ]);
   };
 
@@ -113,7 +113,9 @@ export default function Home() {
 
     const initCamera = async () => {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: { facingMode: "user", 
+          frameRate: { ideal: 30, min: 30 },
+         },
       });
       videoRef.current.srcObject = stream;
       await videoRef.current.play();
@@ -274,14 +276,15 @@ export default function Home() {
     const { left, center, right } = calibrationData;
     if (left === null || center === null || right === null) {
       toast.info('Please calibrate left, right, and center first.');
-      return false
+      return false;
     }
-    if (videoRef.current === null) {
+    const video = videoRef.current;
+    if (video && !video.srcObject) {
       const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
+        video: { facingMode: "user", frameRate: { ideal: 30, min: 30 } },
       });
-      videoRef.current.srcObject = stream;
-      await videoRef.current.play();
+      video.srcObject = stream;
+      await video.play();
     }
     recordingRef.current = [];
     setRecording(true);
@@ -292,11 +295,12 @@ export default function Home() {
     const video = videoRef.current;
     if (video) {
       const stream = video.srcObject;
-      const tracks = stream.getTracks();
-
-      tracks.forEach(track => track.stop());
+      if (stream) {
+        const tracks = stream.getTracks();
+        tracks.forEach(track => track.stop());
+      }
+      video.srcObject = null; // Clear the stream, but keep the ref!
     }
-    videoRef.current = null
     // TODO: persist to IndexedDB or offer JSON download
     console.table(recordingRef.current);
   };
@@ -305,7 +309,7 @@ export default function Home() {
   return (
     <div className="flex flex-col items-center justify-center min-h-screen w-screen bg-white text-black px-6 py-4 overflow-y-auto">
       <ToastContainer />
-      <h2>Record eye</h2>
+      {/* <h2>Record eye</h2> */}
       <p>FPS: {currentFpsRef.current.toFixed(2)}</p>
       <div className="relative w-full sm:w-[640px] h-[480px] rounded-xl">
         <canvas id="frameRateGraph" width="90" height="20" style={{ position: 'absolute', top: 0, right: 0, zIndex: 100 }}></canvas>
@@ -342,7 +346,7 @@ export default function Home() {
           }
       </div>
       <div className="w-full max-w-2xl mx-auto mt-4">
-        <D3Chart data={gazeData} />
+        <D3Chart data={gazeData} xIsTime={true} yRange={[-1, 1]} yLabel="X position normalised" />
       </div>
       <p className="mt-4 text-sm text-slate-400">Session ID: {sessionId}</p>
     </div>

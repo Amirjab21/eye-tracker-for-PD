@@ -1,9 +1,8 @@
--- Create user and database
-CREATE ROLE gaze WITH LOGIN PASSWORD 'password';
-CREATE DATABASE gaze_data OWNER gaze;
-GRANT ALL PRIVILEGES ON DATABASE gaze_data TO gaze;
+
 
 -- TODO make this secure
+
+\c gaze_data
 
 CREATE TABLE gaze_data (
   session_id UUID NOT NULL,
@@ -32,3 +31,5 @@ CREATE TABLE processed (
 );
 
 SELECT create_hypertable('processed', 'timestamp_ms');
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO gaze;
