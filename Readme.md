@@ -101,7 +101,7 @@ As this may become heavier over time, I decided to make this its own service to 
 
    ```sh
    git clone https://github.com/Amirjab21/eye-tracker-for-PD
-   cd gaze-pwa
+   cd eye-tracker-for-PD
    ```
 
 2. **Start all services with Docker Compose:**

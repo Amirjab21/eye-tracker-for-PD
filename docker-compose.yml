@@ -105,8 +105,8 @@ services:
       - "5173:5173"
     depends_on:
       - fastapi
-    env_file:
-      - ./frontend/.env
+    # env_file: for now - we just ignore the .env as its not needed for development
+    #   - ./frontend/.env
     environment:
       - VITE_BACKEND_URL=http://localhost:8000 #override so that it works with docker-compose
     volumes:
