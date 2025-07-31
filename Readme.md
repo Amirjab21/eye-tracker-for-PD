@@ -12,6 +12,87 @@ The above diagram illustrates the architecture of the Gaze PWA system, showing h
 
 ---
 
+## Demo
+
+🎬 **Watch the system in action:** [YouTube Demo Video](https://www.youtube.com/watch?v=LBmMD9P-XFo)
+
+See how the Gaze PWA collects, processes, and visualizes gaze tracking data in real-time.
+
+---
+
+## Setup & Running the App
+
+1. **Clone the repository:**
+
+   ```sh
+   git clone https://github.com/Amirjab21/eye-tracker-for-PD
+   cd eye-tracker-for-PD
+   ```
+
+2. **Start all services with Docker Compose:**
+
+   ```sh
+   docker-compose up --build
+   ```
+
+   - The first run may take a few minutes to build images and initialize the database.
+
+3. **Access the app:**
+   - **Frontend:** [http://localhost:5173](http://localhost:5173)
+   - **Backend API (FastAPI):** [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
+
+---
+
+## Environment Variables
+
+- The frontend uses `VITE_BACKEND_URL` to know where to send API requests. This is set in `docker-compose.yml` for Docker, or in `.env` for local dev.
+- The backend services use environment variables for database and Kafka connection details (see `docker-compose.yml`).
+
+---
+
+## Troubleshooting
+
+- **Database errors:** If you change the database schema or user, you may need to remove the Docker volume to re-initialize:
+  ```sh
+  docker-compose down
+  docker volume rm gaze-pwa_timescale_data
+  docker-compose up --build
+  ```
+- **Frontend not hot reloading:** Ensure you are running the Vite dev server (not Nginx) and that the volume mount is set up in `docker-compose.yml`.
+- **API requests fail with `net::ERR_NAME_NOT_RESOLVED`:** Make sure your frontend is configured to use `http://localhost:8000` for API calls, not the Docker service name.
+
+---
+
+## Stopping the App
+
+To stop all services:
+
+```sh
+docker-compose down
+```
+
+---
+
+## Directory Structure
+
+```
+gaze-pwa/
+  backend/
+    fastAPI/           # FastAPI backend
+    processing-service/# Data processing service
+    init.sql           # Database schema and user setup
+  frontend/            # React PWA frontend
+  docker-compose.yml   # Orchestration config
+```
+
+---
+
+## Contact
+
+For questions or issues, please open an issue in this repository.
+
+---
+
 ## Design Choices
 
 ### Database
@@ -92,76 +173,3 @@ As this may become heavier over time, I decided to make this its own service to 
 ## Prerequisites
 
 - [Docker](https://www.docker.com/get-started) and [Docker Compose](https://docs.docker.com/compose/) installed
-
----
-
-## Setup & Running the App
-
-1. **Clone the repository:**
-
-   ```sh
-   git clone https://github.com/Amirjab21/eye-tracker-for-PD
-   cd eye-tracker-for-PD
-   ```
-
-2. **Start all services with Docker Compose:**
-
-   ```sh
-   docker-compose up --build
-   ```
-
-   - The first run may take a few minutes to build images and initialize the database.
-
-3. **Access the app:**
-   - **Frontend:** [http://localhost:5173](http://localhost:5173)
-   - **Backend API (FastAPI):** [http://localhost:8000/docs](http://localhost:8000/docs) (Swagger UI)
-
----
-
-## Environment Variables
-
-- The frontend uses `VITE_BACKEND_URL` to know where to send API requests. This is set in `docker-compose.yml` for Docker, or in `.env` for local dev.
-- The backend services use environment variables for database and Kafka connection details (see `docker-compose.yml`).
-
----
-
-## Troubleshooting
-
-- **Database errors:** If you change the database schema or user, you may need to remove the Docker volume to re-initialize:
-  ```sh
-  docker-compose down
-  docker volume rm gaze-pwa_timescale_data
-  docker-compose up --build
-  ```
-- **Frontend not hot reloading:** Ensure you are running the Vite dev server (not Nginx) and that the volume mount is set up in `docker-compose.yml`.
-- **API requests fail with `net::ERR_NAME_NOT_RESOLVED`:** Make sure your frontend is configured to use `http://localhost:8000` for API calls, not the Docker service name.
-
----
-
-## Stopping the App
-
-To stop all services:
-
-```sh
-docker-compose down
-```
-
----
-
-## Directory Structure
-
-```
-gaze-pwa/
-  backend/
-    fastAPI/           # FastAPI backend
-    processing-service/# Data processing service
-    init.sql           # Database schema and user setup
-  frontend/            # React PWA frontend
-  docker-compose.yml   # Orchestration config
-```
-
----
-
-## Contact
-
-For questions or issues, please open an issue in this repository.
