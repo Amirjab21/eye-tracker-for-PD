@@ -3,6 +3,8 @@ import asyncio
 from aiokafka import AIOKafkaConsumer
 from aiokafka.admin import AIOKafkaAdminClient, NewTopic
 import os
+import json
+from utils import validate, calculate_velocity_and_anomalies, insert_processed
 
 app = FastAPI()
 KAFKA_BOOTSTRAP_SERVERS = os.getenv("KAFKA_BOOTSTRAP_SERVERS", "kafka:9092")
@@ -35,6 +37,10 @@ async def consume():
     try:
         async for msg in consumer:
             print(f"Received: {msg.value.decode()}")
+            data = json.loads(msg.value.decode())
+            if validate(data):
+                processed = calculate_velocity_and_anomalies(data)
+                await insert_processed(processed)
     finally:
         await consumer.stop()
 

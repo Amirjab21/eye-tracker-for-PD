@@ -17,7 +17,16 @@ const FrequencyAnalysis = ({ data} ) => {
   
       // 1️⃣ Ensure power‑of‑two length for radix‑2 FFT
       const N = 1 << Math.floor(Math.log2(data.length));
-      const values = data.slice(0, N).map((p) => p.value);
+      const raw = data.slice(0, N).map((p) => p.value);
+      // 1️⃣ de-mean
+      const mean = raw.reduce((a, b) => a + b, 0) / N;
+      let values = raw.map((v) => v - mean);
+      // 2️⃣ optional: apply Hann window to reduce spectral leakage
+      function hannWindow(arr) {
+        const N = arr.length;
+        return arr.map((v, n) => v * (0.5 - 0.5 * Math.cos((2 * Math.PI * n) / (N - 1))));
+      }
+      values = hannWindow(values);
       // Convert Date to ms number
       const times = data.slice(0, N).map((p) =>
         p.timestamp instanceof Date ? p.timestamp.getTime() : Number(p.timestamp)

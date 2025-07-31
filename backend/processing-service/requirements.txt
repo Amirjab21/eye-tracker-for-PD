@@ -2,3 +2,4 @@ fastapi
 uvicorn[standard]
 aiokafka==0.8.0
 kafka-python==2.0.2
+asyncpg

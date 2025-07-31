@@ -63,8 +63,10 @@ services:
         "0.0.0.0",
         "--port",
         "8001",
+        "--reload",
       ]
     volumes:
+      - ./processing-service:/app
       - ./wait-for-kafka.sh:/app/wait-for-kafka.sh
 
   fastapi:
@@ -88,8 +90,10 @@ services:
         "0.0.0.0",
         "--port",
         "8000",
+        "--reload",
       ]
     volumes:
+      - ./fastAPI:/app
       - ./wait-for-kafka.sh:/app/wait-for-kafka.sh
 
 volumes:

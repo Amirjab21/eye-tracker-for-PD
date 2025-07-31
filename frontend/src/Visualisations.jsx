@@ -126,7 +126,7 @@ export default function Visualisations() {
         <div className="w-full h-full flex items-center flex-col py-6 px-6">
             <div className="sm:w-[70vw] w-full">
                 <h2 className="text-4xl">Visualisations</h2>
-                <div className="mb-4">
+                <div className="mb-4 flex flex-row justify-end">
                     <label htmlFor="session-select" className="mr-2">Session:</label>
                     <select
                         id="session-select"
