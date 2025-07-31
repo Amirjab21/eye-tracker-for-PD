@@ -70,14 +70,12 @@ const FrequencyAnalysis = ({ data} ) => {
 
   // Log all amp values before rendering
   // Generate a unique chartId for this chart instance
-  const chartId = React.useRef(`freq-chart-${Math.random().toString(36).substr(2, 9)}`);
 
   const spectrumForD3 = spectrum.map(d => ({
     timestamp: d.freq, // use frequency as the x-axis
     value: d.amp       // use amplitude as the y-axis
   }));
 
-  console.log(spectrum, 'spectrumForD3')
 
   return (
         <div>

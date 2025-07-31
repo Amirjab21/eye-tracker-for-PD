@@ -1,167 +1,179 @@
-import React, { useEffect, useState } from 'react';
-import Chart from "./components/chart";
-import Chart2 from "./components/chart2";
-// import MuiChart from "./components/muichart";
+import React from 'react';
 import D3Chart from "./components/d3chart";
-import D3V2 from "./components/d3v2";
-import _ from 'lodash';
 import FrequencyAnalysis from "./components/frequencyanalysis";
+import { useSessionData } from "./hooks/useSessionData";
+import { useDataAnalysis } from "./hooks/useDataAnalysis";
 
-const calculateVelocity = (data) => {
-    return data.slice(1).map((point, index) => {
-      const prevPoint = data[index];
-      const timeDiff = (point.timestamp - prevPoint.timestamp) / 1000; // Convert ms to seconds
-      const valueDiff = point.value - prevPoint.value;
-      return {
-        timestamp: point.timestamp,
-        value: valueDiff / timeDiff, // pixels/second or degrees/second
-      };
-    });
-  };
+/**
+ * Statistics display component
+ */
+function StatisticsDisplay({ title, stats }) {
+  return (
+    <div className="bg-gray-50 p-4 rounded-lg">
+      <h3 className="text-lg font-semibold mb-3">{title}</h3>
+      <div className="grid grid-cols-2 gap-2 text-sm">
+        <div>Mean: <span className="font-mono">{stats.mean?.toFixed(4) || 'N/A'}</span></div>
+        <div>Median: <span className="font-mono">{stats.median?.toFixed(4) || 'N/A'}</span></div>
+        <div>Std Dev: <span className="font-mono">{stats.stdDev?.toFixed(4) || 'N/A'}</span></div>
+        <div>Range: <span className="font-mono">{stats.range?.toFixed(4) || 'N/A'}</span></div>
+        <div>Min: <span className="font-mono">{stats.min?.toFixed(4) || 'N/A'}</span></div>
+        <div>Max: <span className="font-mono">{stats.max?.toFixed(4) || 'N/A'}</span></div>
+      </div>
+    </div>
+  );
+}
 
-const calculateSummaryStatistics = (data) => {
+/**
+ * Session metrics display component
+ */
+function SessionMetrics({ metrics }) {
+  return (
+    <div className="bg-blue-50 p-4 rounded-lg">
+      <h3 className="text-lg font-semibold mb-3">Session Metrics</h3>
+      <div className="grid grid-cols-3 gap-2 text-sm">
+        <div>Duration: <span className="font-mono">{metrics.duration?.toFixed(1)}s</span></div>
+        <div>Data Points: <span className="font-mono">{metrics.dataPoints}</span></div>
+        <div>Sampling Rate: <span className="font-mono">{metrics.samplingRate?.toFixed(1)} Hz</span></div>
+      </div>
+    </div>
+  );
+}
 
-    const median = arr => {
-    const sorted = [...arr].sort((a, b) => a - b);
-    const mid = Math.floor(sorted.length / 2);
-    return sorted.length % 2 !== 0
-        ? sorted[mid]
-        : (sorted[mid - 1] + sorted[mid]) / 2;
-    };
-    
-    const stdDev = arr => {
-    const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-    return Math.sqrt(arr.reduce((a, b) => a + (b - mean) ** 2, 0) / arr.length);
-    };
-  const values = data.map(point => point.value);
-  return {
-    mean: _.mean(values),
-    median: median(values),
-    stdDev: stdDev(values),
-    range: _.max(values) - _.min(values),
-  };
-};
+/**
+ * Error display component
+ */
+function ErrorDisplay({ error }) {
+  return (
+    <div className="bg-red-50 border border-red-200 p-4 rounded-lg">
+      <h3 className="text-red-800 font-semibold mb-2">Error</h3>
+      <p className="text-red-600 text-sm">{error}</p>
+    </div>
+  );
+}
 
-const generateData = () => {
-    const now = Date.now();
-    return Array.from({ length: 1000 }, (_, i) => ({
-      timestamp: now + i * 1000, // Increment time by 1 second
-      value: Math.random() * 2 - 1, // Random value between -1 and 1
-    }));
-  };
-  
-
-//   const generateSimpleConvexData = (length = 1000) => {
-//     const now = Date.now();
-//     const data = [];
-//     const half = Math.floor(length / 2);
-  
-//     for (let i = 0; i < length; i++) {
-//       let value;
-//       if (i < half) {
-//         // Linear decrease from 1 to 0
-//         value = 1 - (i / (half - 1));
-//       } else {
-//         // Convex decrease from 0 to -1 (quadratic curve)
-//         const t = (i - half) / (length - half - 1); // t in [0,1]
-//         value = 0 - t * t; // Quadratic: convex from 0 to -1
-//       }
-//       data.push({
-//         date: new Date(now + i * 1000),
-//         value,
-//       });
-//     }
-//     return data;
-//   };
-  
-  // Example usage
-//   const dummydata = generateSimpleConvexData(1000);
-//   const dummydata = generateData();
-// console.log(dummydata, 'dum')
-
-//   const velocityData = calculateVelocity(dummydata);
-//   console.log(velocityData, 'veloc')
-// //   const frequencyData = performFrequencyAnalysis(dummydata);
-//   const summaryStats = calculateSummaryStatistics(dummydata);
-
+/**
+ * Main Visualisations component
+ */
 export default function Visualisations() {
-    const [sessionIds, setSessionIds] = useState([]);
-    const [selectedSessionId, setSelectedSessionId] = useState('');
-    const [sessionData, setSessionData] = useState([]);
-    const [loading, setLoading] = useState(false);
+  // Fetch session data
+  const {
+    sessionIds,
+    selectedSessionId,
+    sessionData,
+    loading,
+    error,
+    selectSession,
+    refreshSessionIds,
+  } = useSessionData();
 
-    console.log(import.meta.env.VITE_BACKEND_URL, 'backend url')
-    useEffect(() => {
-        // Fetch session IDs on mount
-        fetch(`${import.meta.env.VITE_BACKEND_URL}/api/get_session_ids`)
-            .then(res => res.json())
-            .then(data => {
-                setSessionIds(data.session_ids || []);
-                if (data.session_ids && data.session_ids.length > 0) {
-                    setSelectedSessionId(data.session_ids[0]);
-                }
-            });
-    }, []);
+  // Process data for analysis
+  const {
+    chartData,
+    velocityData,
+    summaryStats,
+    velocityStats,
+    metrics,
+    hasData,
+  } = useDataAnalysis(sessionData);
 
-    useEffect(() => {
-        if (!selectedSessionId) return;
-        setLoading(true);
-        fetch(`${import.meta.env.VITE_BACKEND_URL}/api/download?session_id=${selectedSessionId}&as_json=true`)
-            .then(res => res.json())
-            .then(data => {
-                setSessionData(data.data || []);
-                setLoading(false);
-            });
-    }, [selectedSessionId]);
-
-    // Use sessionData for all calculations
-    const dummydata = sessionData.length > 0 ? sessionData.map(d => ({
-        timestamp: d.timestamp_ms,
-        value: d.gaze_x
-    })) : generateData();
-    const velocityData = calculateVelocity(dummydata);
-    const summaryStats = calculateSummaryStatistics(dummydata);
-
-    return (
-        <div className="w-full h-full flex items-center flex-col py-6 px-6">
-            <div className="sm:w-[70vw] w-full">
-                <h2 className="text-4xl">Visualisations</h2>
-                <div className="mb-4 flex flex-row justify-end">
-                    <label htmlFor="session-select" className="mr-2">Session:</label>
-                    <select
-                        id="session-select"
-                        value={selectedSessionId}
-                        onChange={e => setSelectedSessionId(e.target.value)}
-                        className="border px-2 py-1 rounded"
-                    >
-                        {sessionIds.map(id => (
-                            <option key={id} value={id}>{id}</option>
-                        ))}
-                    </select>
-                </div>
-                {loading ? <div>Loading session data...</div> : <>
-                <div className="w-full flex">
-                    <D3Chart data={dummydata} yRange={[-1, 1]} yLabel="X position normalised" /> 
-                </div>
-                
-                {/* Display velocityData using a chart or table */}
-                <div className="w-full">
-                    <D3Chart data={velocityData} yLabel="movement velocity" />
-                </div>
-                
-                <div>
-                    <FrequencyAnalysis data={dummydata} />
-                </div>
-                {/* Display frequencyData using a chart */}
-                <h2>Session Summary Statistics</h2>
-                <ul>
-                    <li>Mean: {summaryStats.mean}</li>
-                    <li>Median: {summaryStats.median}</li>
-                    <li>Standard Deviation: {summaryStats.stdDev}</li>
-                    <li>Range: {summaryStats.range}</li>
-                </ul>
-                </>}
-            </div>
+  return (
+    <div className="w-full h-full flex items-center flex-col py-6 px-6">
+      <div className="sm:w-[70vw] w-full">
+        <div className="flex justify-between items-center mb-6">
+          <h2 className="text-4xl font-bold">Visualisations</h2>
+          <button 
+            onClick={refreshSessionIds}
+            className="px-3 py-1 bg-blue-500 rounded hover:bg-blue-600"
+          >
+            Refresh
+          </button>
         </div>
-    );
+
+        {/* Session Selection */}
+        <div className="mb-6 flex flex-row justify-end items-center gap-2">
+          <label htmlFor="session-select" className="font-medium">Session:</label>
+          <select
+            id="session-select"
+            value={selectedSessionId}
+            onChange={e => selectSession(e.target.value)}
+            className="border px-3 py-2 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={loading}
+          >
+            {sessionIds.length === 0 && (
+              <option value="">No sessions available</option>
+            )}
+            {sessionIds.map(id => (
+              <option key={id} value={id}>{id}</option>
+            ))}
+          </select>
+        </div>
+
+        {/* Error Display */}
+        {error && <ErrorDisplay error={error} />}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="flex justify-center py-8">
+            <div className="text-lg">Loading session data...</div>
+          </div>
+        )}
+
+        {/* Main Content */}
+        {!loading && hasData && (
+          <div className="space-y-8">
+            {/* Session Metrics */}
+            <SessionMetrics metrics={metrics} />
+
+            {/* Main Gaze Position Chart */}
+            <div className="w-full">
+              <h3 className="text-xl font-semibold mb-3">Gaze Position Over Time</h3>
+              <D3Chart 
+                data={chartData} 
+                yRange={[-1, 1]} 
+                yLabel="X position normalised" 
+              />
+            </div>
+
+            {/* Velocity Chart */}
+            <div className="w-full">
+              <h3 className="text-xl font-semibold mb-3">Gaze Velocity</h3>
+              <D3Chart 
+                data={velocityData} 
+                yLabel="Movement velocity (units/s)" 
+              />
+            </div>
+
+            {/* Frequency Analysis */}
+            <div className="w-full">
+              <h3 className="text-xl font-semibold mb-3">Frequency Analysis</h3>
+              <FrequencyAnalysis data={chartData} />
+            </div>
+
+            {/* Statistics */}
+            <div className="grid md:grid-cols-2 gap-6">
+              <StatisticsDisplay 
+                title="Gaze Position Statistics" 
+                stats={summaryStats} 
+              />
+              <StatisticsDisplay 
+                title="Velocity Statistics" 
+                stats={velocityStats} 
+              />
+            </div>
+          </div>
+        )}
+
+        {/* No Data State */}
+        {!loading && !hasData && !error && (
+          <div className="text-center py-12">
+            <p className="text-gray-600 text-lg">
+              {sessionIds.length === 0 
+                ? "No sessions available. Record some data first." 
+                : "No data found for the selected session."}
+            </p>
+          </div>
+        )}
+      </div>
+    </div>
+  );
 }
