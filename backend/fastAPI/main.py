@@ -83,7 +83,7 @@ async def upload(request: Request):
 
 
 @app.get("/api/download")
-async def download_data(session_id: uuid.UUID):
+async def download_data(session_id: uuid.UUID, as_json: bool = False):
     try:
         async with app.state.db.acquire() as conn:
             rows = await conn.fetch(
@@ -99,6 +99,11 @@ async def download_data(session_id: uuid.UUID):
                 raise HTTPException(
                     status_code=404, detail="Data not found for the given session_id"
                 )
+
+            if as_json:
+                # Convert rows to list of dicts
+                data = [dict(row) for row in rows]
+                return {"data": data}
 
             # Create a CSV from the rows
             output = StringIO()
@@ -126,6 +131,19 @@ async def download_data(session_id: uuid.UUID):
                     "Content-Disposition": f"attachment; filename={session_id}.csv"
                 },
             )
+    except Exception as e:
+        print(f"Error: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
+
+
+@app.get("/api/get_session_ids")
+async def get_session_ids():
+    print("get_session_ids")
+    try:
+        async with app.state.db.acquire() as conn:
+            rows = await conn.fetch("SELECT DISTINCT session_id FROM gaze_data")
+            session_ids = [str(row["session_id"]) for row in rows]
+        return {"session_ids": session_ids}
     except Exception as e:
         print(f"Error: {e}")
         raise HTTPException(status_code=500, detail="Internal Server Error")

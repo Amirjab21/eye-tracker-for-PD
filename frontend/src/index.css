@@ -29,18 +29,23 @@ a:hover {
 body, html {
   width: 100vw;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
   margin: 0;
   padding: 0;
-  overflow-x: hidden; /* Prevent horizontal scrolling */
+  overflow-x: hidden;
 }
 
-#root {
+/* #root {
   width: 100vw;
   height: 100vh;
   display: flex;
   justify-content: center;
   align-items: center;
-}
+  display: flex;
+  flex-direction: column;
+} */
+
 
 h1 {
   font-size: 3.2em;

@@ -1,0 +1,94 @@
+import React, { useMemo } from "react";
+import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import FFT from "fft.js";
+// import { Card, CardContent } from "@/components/ui/card";
+
+/**
+ * FrequencyAnalysis – visualises the dominant movement frequencies in a horizontal eye‑movement time‑series.
+ *
+ * @param {Array<{ data: number, value: number }>} data  – timestamp (ms) & horizontal‑position pairs
+ */
+const FrequencyAnalysis = ({ data} ) => {
+    const { spectrum, dominantFreq } = useMemo(() => {
+  
+      if (!data || data.length < 4) {
+
+        return { spectrum: [], dominantFreq: 0 };
+      }
+  
+      // 1️⃣ Ensure power‑of‑two length for radix‑2 FFT
+      const N = 1 << Math.floor(Math.log2(data.length));
+      const values = data.slice(0, N).map((p) => p.value);
+      // Convert Date to ms number
+      const times = data.slice(0, N).map((p) =>
+        p.timestamp instanceof Date ? p.timestamp.getTime() : Number(p.timestamp)
+      );
+  
+      // 2️⃣ Estimate sampling rate (assumes quasi‑uniform sampling in ms)
+      const avgDt = (times[times.length - 1] - times[0]) / (times.length - 1);
+      const sampleRate = 1000 / avgDt; // Hz
+  
+      // 3️⃣ Run FFT
+      const fft = new FFT(N);
+      // --- FFT.js correct usage for real input ---
+      const input = values; // real input, length N
+      const output = fft.createComplexArray(); // length 2*N
+      fft.realTransform(output, input);
+      fft.completeSpectrum(output);
+
+      // Magnitude spectrum
+      const mags = [];
+      for (let i = 0; i < N / 2; i++) {
+        const re = output[2 * i];
+        const im = output[2 * i + 1];
+        mags.push(Math.hypot(re, im));
+      }
+      const spectrum = mags.map((mag, i) => ({
+        freq: (i * sampleRate) / N,
+        amp: mag,
+      }));
+  
+      // 5️⃣ Dominant frequency
+      const dominant = spectrum.reduce(
+        (a, b) => (b.amp > a.amp ? b : a),
+        spectrum[0] || { freq: 0, amp: 0 }
+      );
+  
+      return {
+        spectrum,
+        dominantFreq: dominant ? dominant.freq.toFixed(2) : 0,
+      };
+    }, [data]);
+
+  // Log all amp values before rendering
+  // Generate a unique chartId for this chart instance
+  const chartId = React.useRef(`freq-chart-${Math.random().toString(36).substr(2, 9)}`);
+
+  return (
+        <div>
+            <h2 className="text-xl font-bold mb-2">Horizontal‑Movement Frequency Spectrum</h2>
+            {spectrum.length ? (
+            <>
+                <LineChart
+                  width={600}
+                  height={300}
+                  data={spectrum}
+                  margin={{ top: 10, right: 30, left: 20, bottom: 20 }}
+                  id={chartId.current}
+                >
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" dataKey="freq" label={{ value: "Frequency (Hz)", position: "insideBottom", offset: -10 }} tickFormatter={(v) => v.toFixed(2)} />
+                <YAxis dataKey="amp" label={{ value: "Amplitude", angle: -90, position: "insideLeft" }} />
+                {/* <Tooltip formatter={(v) => v.toFixed(2)} /> */}
+                <Line type="monotone" dataKey="amp" strokeWidth={2} dot={false} />
+                </LineChart>
+                <p className="mt-4 text-sm text-muted-foreground">Dominant frequency ≈ <strong>{dominantFreq}</strong> Hz</p>
+            </>
+            ) : (
+            <p>Provide at least four data to compute a spectrum.</p>
+            )}
+      </div>
+  );
+};
+
+export default FrequencyAnalysis;
