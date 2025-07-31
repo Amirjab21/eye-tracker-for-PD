@@ -4,6 +4,59 @@ This project is a monorepo containing a full-stack web application for gaze trac
 
 ---
 
+## Infrastructure
+
+![Infrastructure Diagram](./infra.png)
+
+The above diagram illustrates the architecture of the Gaze PWA system, showing how the React frontend communicates with the backend services, data flow through Kafka for real-time processing, and storage in both local IndexedDB and TimescaleDB.
+
+---
+
+## Design Choices
+
+### Database
+
+We want a highly scalable datastore for time series data. We want to be able to query individuals and sessions with high performance. This querying leans me towards SQL-like databases. To allow for high amounts of scalability, we can use something like TimescaleDB on top of postgres which is ideal for time series data at scale.
+
+The processed data we are storing has the following columns:
+
+- `session_id` UUID
+- `user_id` UUID
+- `timestamp_ms` BIGINT
+- `gaze_x` FLOAT
+- `sampling_rate` INTEGER
+- `calibration_params` FLOAT[3]
+- `device` TEXT
+- `velocity` FLOAT
+- `is_anomaly` BOOLEAN
+
+### Visualisations
+
+I used D3.js to give us maximum flexibility to customise visualisations and interactivity going forward. This is a far better solution than many off-the-shelf libraries.
+
+### Data Streaming
+
+I have created a kafka streaming service to allow us to process a large amount of data in a distributed manner in case our activity suddenly increases.
+
+### Separate Service for Processing Data
+
+As this may become heavier over time, I decided to make this its own service to ensure any heavy tasks do not affect our public facing API. This decoupling also allows us to scale up this specific service in case the load increases.
+
+### Things Left to Do
+
+- Bring all secrets and env variables to an `.env` file which is imported into docker-compose
+- Use kubernetes for deployment if we want multi-node deployments (easy task)
+- Currently, the user data is uploaded to the public API which then sends it to the processing engine. This engine calculates and stores the velocity data and the validity of the data using a hardcoded velocity metric. We should decide on the best method for anomaly detection. We could potentially use a neural network here or stick to simple heuristics that exclude extreme values.
+- Make visualisations nicer
+- Note that we still perform some of the derived calculations (velocity and movement frequency) on the frontend as these have not been updated to query the data saved by the processing engine yet.
+- Testing for buggy behaviour. Sometimes the user can create duplicate inputs by repeatedly pausing and restarting the recording.
+- Handle missing data. I've currently attached the frame rate onto every single row so we can remove data that does not meet the minimum standard. Possible ideas for small patches of missing data could include using the last available record as a guide for the missing data.
+- Authentication
+- Cleaning up the frontend code
+- Use typescript for increased safety, developer productivity and improved context for LLM assistance
+
+---
+
 ## Services Overview
 
 ### 1. **frontend**
