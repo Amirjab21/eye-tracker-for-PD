@@ -44,7 +44,7 @@ See how the Gaze PWA collects, processes, and visualizes gaze tracking data in r
 ---
 
 ## Environment Variables
-
+- For local development, dont worry about it, you dont need to do anything.
 - The frontend uses `VITE_BACKEND_URL` to know where to send API requests. This is set in `docker-compose.yml` for Docker, or in `.env` for local dev.
 - The backend services use environment variables for database and Kafka connection details (see `docker-compose.yml`).
 
