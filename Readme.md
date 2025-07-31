@@ -100,7 +100,7 @@ As this may become heavier over time, I decided to make this its own service to 
 1. **Clone the repository:**
 
    ```sh
-   git clone <your-repo-url>
+   git clone https://github.com/Amirjab21/eye-tracker-for-PD
    cd gaze-pwa
    ```
 
